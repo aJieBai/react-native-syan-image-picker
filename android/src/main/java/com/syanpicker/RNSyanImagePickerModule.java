@@ -71,6 +71,13 @@ public class RNSyanImagePickerModule extends ReactContextBaseJavaModule {
         this.mPickerCallback = callback;
         this.openImagePicker();
     }
+    @ReactMethod
+    public void showPicker(ReadableMap options, Callback callback) {
+        this.cameraOptions = options;
+        this.mPickerPromise = null;
+        this.mPickerCallback = callback;
+        this.openPicker();
+    }
 
     @ReactMethod
     public void asyncShowImagePicker(ReadableMap options, Promise promise) {
@@ -179,6 +186,76 @@ public class RNSyanImagePickerModule extends ReactContextBaseJavaModule {
         Activity currentActivity = getCurrentActivity();
         PictureSelector.create(currentActivity)
                 .openGallery(PictureMimeType.ofImage())//全部.PictureMimeType.ofAll()、图片.ofImage()、视频.ofVideo()、音频.ofAudio()
+                .loadImageEngine(GlideEngine.createGlideEngine())
+                .maxSelectNum(imageCount)// 最大图片选择数量 int
+                .minSelectNum(0)// 最小选择数量 int
+                .imageSpanCount(4)// 每行显示个数 int
+                .selectionMode(modeValue)// 多选 or 单选 PictureConfig.MULTIPLE or PictureConfig.SINGLE
+                .previewImage(true)// 是否可预览图片 true or false
+                .previewVideo(false)// 是否可预览视频 true or false
+                .enablePreviewAudio(false) // 是否可播放音频 true or false
+                .isCamera(isCamera)// 是否显示拍照按钮 true or false
+                .imageFormat(isAndroidQ ? PictureMimeType.PNG_Q : PictureMimeType.PNG)// 拍照保存图片格式后缀,默认jpeg
+                .isZoomAnim(true)// 图片列表点击 缩放效果 默认true
+                .sizeMultiplier(0.5f)// glide 加载图片大小 0~1之间 如设置 .glideOverride()无效
+                .enableCrop(isCrop)// 是否裁剪 true or false
+                .compress(compress)// 是否压缩 true or false
+                .glideOverride(160, 160)// int glide 加载宽高，越小图片列表越流畅，但会影响列表图片浏览的清晰度
+                .withAspectRatio(CropW, CropH)// int 裁剪比例 如16:9 3:2 3:4 1:1 可自定义
+                .hideBottomControls(isCrop)// 是否显示uCrop工具栏，默认不显示 true or false
+                .isGif(isGif)// 是否显示gif图片 true or false
+                .freeStyleCropEnabled(freeStyleCropEnabled)// 裁剪框是否可拖拽 true or false
+                .circleDimmedLayer(showCropCircle)// 是否圆形裁剪 true or false
+                .showCropFrame(showCropFrame)// 是否显示裁剪矩形边框 圆形裁剪时建议设为false   true or false
+                .showCropGrid(showCropGrid)// 是否显示裁剪矩形网格 圆形裁剪时建议设为false    true or false
+                .openClickSound(false)// 是否开启点击声音 true or false
+                .cropCompressQuality(quality)// 裁剪压缩质量 默认90 int
+                .minimumCompressSize(minimumCompressSize)// 小于100kb的图片不压缩
+                .synOrAsy(true)//同步true或异步false 压缩 默认同步
+                .rotateEnabled(rotateEnabled) // 裁剪是否可旋转图片 true or false
+                .scaleEnabled(scaleEnabled)// 裁剪是否可放大缩小图片 true or false
+                .selectionMedia(selectList) // 当前已选中的图片 List
+                .isWeChatStyle(isWeChatStyle)
+                .theme(showSelectedIndex ? R.style.picture_WeChat_style : 0)
+                .compressFocusAlpha(compressFocusAlpha)
+                .forResult(PictureConfig.CHOOSE_REQUEST); //结果回调onActivityResult code
+    }
+
+    /**
+     * 打开相册
+     */
+    private void openPicker() {
+        int imageCount = this.cameraOptions.getInt("imageCount");
+        boolean isCamera = this.cameraOptions.getBoolean("isCamera");
+        boolean isCrop = this.cameraOptions.getBoolean("isCrop");
+        int CropW = this.cameraOptions.getInt("CropW");
+        int CropH = this.cameraOptions.getInt("CropH");
+        boolean isGif = this.cameraOptions.getBoolean("isGif");
+        boolean showCropCircle = this.cameraOptions.getBoolean("showCropCircle");
+        boolean showCropFrame = this.cameraOptions.getBoolean("showCropFrame");
+        boolean showCropGrid = this.cameraOptions.getBoolean("showCropGrid");
+        boolean compress = this.cameraOptions.getBoolean("compress");
+        boolean freeStyleCropEnabled = this.cameraOptions.getBoolean("freeStyleCropEnabled");
+        boolean rotateEnabled = this.cameraOptions.getBoolean("rotateEnabled");
+        boolean scaleEnabled = this.cameraOptions.getBoolean("scaleEnabled");
+        int minimumCompressSize = this.cameraOptions.getInt("minimumCompressSize");
+        int quality = this.cameraOptions.getInt("quality");
+        boolean isWeChatStyle = this.cameraOptions.getBoolean("isWeChatStyle");
+        boolean showSelectedIndex = this.cameraOptions.getBoolean("showSelectedIndex");
+        boolean compressFocusAlpha = this.cameraOptions.getBoolean("compressFocusAlpha");
+
+        int modeValue;
+        if (imageCount == 1) {
+            modeValue = 1;
+        } else {
+            modeValue = 2;
+        }
+
+        Boolean isAndroidQ = SdkVersionUtils.checkedAndroid_Q();
+
+        Activity currentActivity = getCurrentActivity();
+        PictureSelector.create(currentActivity)
+                .openGallery(PictureMimeType.ofAll())//全部.PictureMimeType.ofAll()、图片.ofImage()、视频.ofVideo()、音频.ofAudio()
                 .loadImageEngine(GlideEngine.createGlideEngine())
                 .maxSelectNum(imageCount)// 最大图片选择数量 int
                 .minSelectNum(0)// 最小选择数量 int
