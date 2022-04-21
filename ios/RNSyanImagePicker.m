@@ -53,7 +53,14 @@ RCT_EXPORT_METHOD(showImagePicker:(NSDictionary *)options
     self.rejectBlock = nil;
     [self openImagePicker];
 }
-
+RCT_EXPORT_METHOD(showPicker:(NSDictionary *)options
+                         callback:(RCTResponseSenderBlock)callback) {
+    self.cameraOptions = options;
+    self.callback = callback;
+    self.resolveBlock = nil;
+    self.rejectBlock = nil;
+    [self openPicker];
+}
 RCT_REMAP_METHOD(asyncShowImagePicker,
                  options:(NSDictionary *)options
                  showImagePickerResolver:(RCTPromiseResolveBlock)resolve
@@ -281,6 +288,89 @@ RCT_EXPORT_METHOD(openVideoPicker:(NSDictionary *)options callback:(RCTResponseS
 
     [[self topViewController] presentViewController:imagePickerVc animated:YES completion:nil];
 }
+
+
+- (void)openPicker {
+    // 照片最大可选张数
+    NSInteger imageCount = [self.cameraOptions sy_integerForKey:@"imageCount"];
+    // 显示内部拍照按钮
+    BOOL isCamera        = [self.cameraOptions sy_boolForKey:@"isCamera"];
+    BOOL isCrop          = [self.cameraOptions sy_boolForKey:@"isCrop"];
+    BOOL isGif           = [self.cameraOptions sy_boolForKey:@"isGif"];
+    BOOL showCropCircle  = [self.cameraOptions sy_boolForKey:@"showCropCircle"];
+    BOOL isRecordSelected = [self.cameraOptions sy_boolForKey:@"isRecordSelected"];
+    BOOL allowPickingOriginalPhoto = [self.cameraOptions sy_boolForKey:@"allowPickingOriginalPhoto"];
+    BOOL allowPickingMultipleVideo = [self.cameraOptions sy_boolForKey:@"allowPickingMultipleVideo"];
+    BOOL sortAscendingByModificationDate = [self.cameraOptions sy_boolForKey:@"sortAscendingByModificationDate"];
+    BOOL showSelectedIndex = [self.cameraOptions sy_boolForKey:@"showSelectedIndex"];
+    NSInteger CropW      = [self.cameraOptions sy_integerForKey:@"CropW"];
+    NSInteger CropH      = [self.cameraOptions sy_integerForKey:@"CropH"];
+    NSInteger circleCropRadius = [self.cameraOptions sy_integerForKey:@"circleCropRadius"];
+    NSInteger   quality  = [self.cameraOptions sy_integerForKey:@"quality"];
+
+    TZImagePickerController *imagePickerVc = [[TZImagePickerController alloc] initWithMaxImagesCount:imageCount delegate:self];
+
+    imagePickerVc.maxImagesCount = imageCount;
+    imagePickerVc.allowPickingGif = isGif; // 允许GIF
+    imagePickerVc.allowTakePicture = isCamera; // 允许用户在内部拍照
+    imagePickerVc.allowPickingVideo = YES; // 不允许视频
+    imagePickerVc.showSelectedIndex = showSelectedIndex;
+    imagePickerVc.allowPickingOriginalPhoto = allowPickingOriginalPhoto; // 允许原图
+    imagePickerVc.sortAscendingByModificationDate = sortAscendingByModificationDate;
+    imagePickerVc.alwaysEnableDoneBtn = YES;
+    imagePickerVc.allowPickingMultipleVideo = isGif ? YES : allowPickingMultipleVideo;
+    imagePickerVc.allowCrop = isCrop;   // 裁剪
+    imagePickerVc.modalPresentationStyle = UIModalPresentationFullScreen;
+
+    if (isRecordSelected) {
+        imagePickerVc.selectedAssets = self.selectedAssets; // 当前已选中的图片
+    }
+
+    if (imageCount == 1) {
+        // 单选模式
+        imagePickerVc.showSelectBtn = NO;
+
+        if(isCrop){
+            if(showCropCircle) {
+                imagePickerVc.needCircleCrop = showCropCircle; //圆形裁剪
+                imagePickerVc.circleCropRadius = circleCropRadius; //圆形半径
+            } else {
+                CGFloat x = ([[UIScreen mainScreen] bounds].size.width - CropW) / 2;
+                CGFloat y = ([[UIScreen mainScreen] bounds].size.height - CropH) / 2;
+                imagePickerVc.cropRect = CGRectMake(x,y,CropW,CropH);
+            }
+        }
+    }
+
+    __weak TZImagePickerController *weakPicker = imagePickerVc;
+    [imagePickerVc setDidFinishPickingPhotosWithInfosHandle:^(NSArray<UIImage *> *photos,NSArray *assets,BOOL isSelectOriginalPhoto,NSArray<NSDictionary *> *infos) {
+        if (isRecordSelected) {
+            self.selectedAssets = [NSMutableArray arrayWithArray:assets];
+        }
+        [weakPicker showProgressHUD];
+        if (imageCount == 1 && isCrop) {
+            [self invokeSuccessWithResult:@[[self handleCropImage:photos[0] phAsset:assets[0] quality:quality]]];
+        } else {
+            [infos enumerateObjectsUsingBlock:^(NSDictionary * _Nonnull obj, NSUInteger idx, BOOL * _Nonnull stop) {
+                [self handleAssets:assets photos:photos quality:quality isSelectOriginalPhoto:isSelectOriginalPhoto completion:^(NSArray *selecteds) {
+                    [self invokeSuccessWithResult:selecteds];
+                } fail:^(NSError *error) {
+
+                }];
+            }];
+        }
+        [weakPicker hideProgressHUD];
+    }];
+
+    __weak TZImagePickerController *weakPickerVc = imagePickerVc;
+    [imagePickerVc setImagePickerControllerDidCancelHandle:^{
+        [self invokeError];
+        [weakPickerVc hideProgressHUD];
+    }];
+
+    [[self topViewController] presentViewController:imagePickerVc animated:YES completion:nil];
+}
+
 
 - (UIImagePickerController *)imagePickerVc {
     if (_imagePickerVc == nil) {
